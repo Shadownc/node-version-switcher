@@ -47,10 +47,14 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: wails-windows-exe
+          path: ./downloaded-artifact
+
+      - name: List downloaded directory
+        run: ls -R ./downloaded-artifact
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: wails-windows-exe/node-version-switcher.exe  # 从下载的 Artifact 位置获取文件
+          files: ./downloaded-artifact/node-version-switcher.exe  # 使用从下载的路径来引用文件
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
