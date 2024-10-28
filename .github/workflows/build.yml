@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v3
         with:
-          go-version: 1.22  # 根据项目所需的 Go 版本
+          go-version: 1.18  # 根据项目所需的 Go 版本
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
@@ -28,11 +28,14 @@ jobs:
       - name: Build Windows executable
         run: wails build -platform windows/amd64
 
+      - name: List build directory
+        run: dir D:\a\node-version-switcher\node-version-switcher\build\bin
+
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
           name: wails-windows-exe
-          path: ./build/bin/*.exe  # 假设构建的可执行文件在这个路径下
+          path: D:\a\node-version-switcher\node-version-switcher\build\bin\node-version-switcher.exe
 
   release:
     name: Create Release
@@ -48,6 +51,6 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: build/bin/*.exe
+          files: wails-windows-exe/node-version-switcher.exe  # 从下载的 Artifact 位置获取文件
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
