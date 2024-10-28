@@ -1,0 +1,53 @@
+name: Build and Release Wails App
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # 当推送新标签时触发工作流，这通常对应创建新的 release
+
+jobs:
+  build:
+    name: Build for Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Go environment
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.22  # 根据项目所需的 Go 版本
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: Build Windows executable
+        run: wails build -platform windows/amd64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: wails-windows-exe
+          path: ./build/bin/*.exe  # 假设构建的可执行文件在这个路径下
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: wails-windows-exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/bin/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
