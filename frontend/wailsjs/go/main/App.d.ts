@@ -9,3 +9,5 @@ export function GetInstalledNodeVersions():Promise<Array<main.NodeVersion>>;
 export function InstallNodeVersion(arg1:string):Promise<string>;
 
 export function SwitchNodeVersion(arg1:string):Promise<string>;
+
+export function UninstallNodeVersion(arg1:string):Promise<string>;

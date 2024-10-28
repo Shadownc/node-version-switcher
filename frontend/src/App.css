@@ -1,4 +1,5 @@
 @import "./index.css";
+
 #app {
     height: 100vh;
     text-align: center;
@@ -58,24 +59,58 @@
     border: none;
     background-color: rgba(255, 255, 255, 1);
 }
+
 /* Custom scrollbar style */
 .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
     height: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
     background: #2c2c2c;
     border-radius: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
     background-color: #555;
     border-radius: 8px;
     border: 2px solid #2c2c2c;
-  }
-  
-  .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+}
+
+.custom-scrollbar:hover::-webkit-scrollbar-thumb {
     background-color: #888;
-  }
-  
+}
+
+.loader {
+    border: 4px solid #f3f3f3;
+    /* Light grey */
+    border-top: 4px solid #3498db;
+    /* Blue */
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* 设置按钮的固定宽度 */
+.operation-button {
+    width: 100px;
+    /* 确保所有操作按钮宽度一致 */
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    transition: background-color 0.3s;
+}

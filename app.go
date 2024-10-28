@@ -97,6 +97,20 @@ func (a *App) InstallNodeVersion(version string) string {
 	return successMsg
 }
 
+// UninstallNodeVersion uninstalls a specific Node.js version using nvm
+func (a *App) UninstallNodeVersion(version string) string {
+	a.logToFile(fmt.Sprintf("Attempting to uninstall Node.js version: %s", version))
+	output, err := a.executeNvmCommand("uninstall", version)
+	if err != nil {
+		errMsg := fmt.Sprintf("Error uninstalling Node.js %s: %s", version, string(output))
+		a.logToFile(errMsg)
+		return errMsg
+	}
+	successMsg := fmt.Sprintf("Successfully uninstalled Node.js %s", version)
+	a.logToFile(successMsg)
+	return successMsg
+}
+
 // SwitchNodeVersion switches the Node.js version using nvm
 func (a *App) SwitchNodeVersion(version string) string {
 	a.logToFile(fmt.Sprintf("Attempting to switch to Node.js version: %s", version))

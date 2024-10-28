@@ -4,7 +4,8 @@ import {
     SwitchNodeVersion,
     GetAvailableNodeVersions,
     GetInstalledNodeVersions,
-    InstallNodeVersion
+    InstallNodeVersion,
+    UninstallNodeVersion // 引入卸载函数
 } from '../wailsjs/go/main/App';
 
 // 改进版 compareVersions，确保按主、次、小版本的降序排列
@@ -23,7 +24,9 @@ function App() {
     const [availableVersions, setAvailableVersions] = useState([]);
     const [installedVersions, setInstalledVersions] = useState([]);
     const [result, setResult] = useState('');
-    const [maxHeight, setMaxHeight] = useState(window.innerHeight - 220); // 初始化 maxHeight
+    const [maxHeight, setMaxHeight] = useState(window.innerHeight - 220);
+    const [loadingVersion, setLoadingVersion] = useState(null);
+    const [loadingAction, setLoadingAction] = useState(''); // 可以是 'install', 'uninstall', 或 'switch'
 
     // 动态计算 maxHeight，当窗口大小变化时更新
     useEffect(() => {
@@ -43,36 +46,67 @@ function App() {
     };
 
     // 获取所有版本信息
+    const fetchAvailableVersions = async () => {
+        try {
+            const available = await GetAvailableNodeVersions();
+            setAvailableVersions(available.sort(compareVersions));
+        } catch (error) {
+            setResult('Error fetching available versions');
+        }
+    };
+
     useEffect(() => {
         const fetchVersions = async () => {
-            try {
-                const available = await GetAvailableNodeVersions();
-                setAvailableVersions(available.sort(compareVersions));
-                await fetchInstalledVersions();
-            } catch (error) {
-                setResult('Error fetching versions');
-            }
+            await fetchAvailableVersions();
+            await fetchInstalledVersions();
         };
         fetchVersions();
     }, []);
 
     const handleInstallVersion = async (version) => {
+        setLoadingVersion(version);
+        setLoadingAction('install');
         try {
             const response = await InstallNodeVersion(version);
             setResult(response);
             await fetchInstalledVersions();
+            await fetchAvailableVersions();
         } catch (error) {
             setResult('Error installing version');
+        } finally {
+            setLoadingVersion(null);
+            setLoadingAction('');
         }
     };
 
     const handleSwitchVersion = async (version) => {
+        setLoadingVersion(version);
+        setLoadingAction('switch');
         try {
             const response = await SwitchNodeVersion(version);
             setResult(response);
             await fetchInstalledVersions();
         } catch (error) {
             setResult('Error switching version');
+        } finally {
+            setLoadingVersion(null);
+            setLoadingAction('');
+        }
+    };
+
+    const handleUninstallVersion = async (version) => {
+        setLoadingVersion(version);
+        setLoadingAction('uninstall');
+        try {
+            const response = await UninstallNodeVersion(version);
+            setResult(response);
+            await fetchInstalledVersions();
+            await fetchAvailableVersions();
+        } catch (error) {
+            setResult('Error uninstalling version');
+        } finally {
+            setLoadingVersion(null);
+            setLoadingAction('');
         }
     };
 
@@ -84,12 +118,14 @@ function App() {
                 <button
                     className={`px-4 py-2 ${activeTab === 'versions' ? 'bg-blue-500' : 'bg-gray-700'} rounded`}
                     onClick={() => setActiveTab('versions')}
+                    disabled={loadingVersion !== null} // 禁用切换标签按钮
                 >
                     Versions
                 </button>
                 <button
                     className={`px-4 py-2 ${activeTab === 'installed' ? 'bg-blue-500' : 'bg-gray-700'} rounded`}
                     onClick={() => setActiveTab('installed')}
+                    disabled={loadingVersion !== null} // 禁用切换标签按钮
                 >
                     Installed
                 </button>
@@ -123,17 +159,27 @@ function App() {
                                     <td className="px-4 py-2">
                                         {versionInfo.Status === "Installed" ? (
                                             <button
-                                                className="bg-gray-600 px-3 py-1 rounded text-gray-300"
+                                                className="operation-button bg-gray-600 text-gray-300"
                                                 onClick={() => handleSwitchVersion(versionInfo.Version)}
+                                                disabled={loadingVersion !== null}
                                             >
-                                                Use
+                                                {loadingVersion === versionInfo.Version && loadingAction === 'switch' ? (
+                                                    <span className="loader"></span>
+                                                ) : (
+                                                    'Use'
+                                                )}
                                             </button>
                                         ) : (
                                             <button
-                                                className="bg-blue-600 px-3 py-1 rounded text-white"
+                                                className="operation-button bg-blue-600 text-white"
                                                 onClick={() => handleInstallVersion(versionInfo.Version)}
+                                                disabled={loadingVersion !== null}
                                             >
-                                                Install
+                                                {loadingVersion === versionInfo.Version && loadingAction === 'install' ? (
+                                                    <span className="loader"></span>
+                                                ) : (
+                                                    'Install'
+                                                )}
                                             </button>
                                         )}
                                     </td>
@@ -167,29 +213,41 @@ function App() {
                                         )}
                                     </td>
                                     <td className="px-4 py-2">
-                                        {versionData.IsCurrent ? (
-                                            <button
-                                                className="bg-gray-600 px-3 py-1 rounded text-gray-300 cursor-not-allowed"
-                                                disabled
-                                            >
-                                                Current
-                                            </button>
-                                        ) : (
-                                            <>
+                                        <div className="flex space-x-2">
+                                            {versionData.IsCurrent ? (
                                                 <button
-                                                    className="bg-green-600 px-3 py-1 rounded text-white mr-2"
-                                                    onClick={() => handleSwitchVersion(versionData.Version)}
+                                                    className="operation-button bg-gray-600 text-gray-300 cursor-not-allowed"
+                                                    disabled
                                                 >
-                                                    Switch
+                                                    Current
                                                 </button>
-                                                <button
-                                                    className="bg-red-600 px-3 py-1 rounded text-white"
-                                                    onClick={() => {/* 添加卸载功能 */ }}
-                                                >
-                                                    Uninstall
-                                                </button>
-                                            </>
-                                        )}
+                                            ) : (
+                                                <>
+                                                    <button
+                                                        className="operation-button bg-green-600 text-white"
+                                                        onClick={() => handleSwitchVersion(versionData.Version)}
+                                                        disabled={loadingVersion !== null}
+                                                    >
+                                                        {loadingVersion === versionData.Version && loadingAction === 'switch' ? (
+                                                            <span className="loader"></span>
+                                                        ) : (
+                                                            'Switch'
+                                                        )}
+                                                    </button>
+                                                    <button
+                                                        className="operation-button bg-red-600 text-white"
+                                                        onClick={() => handleUninstallVersion(versionData.Version)}
+                                                        disabled={loadingVersion !== null}
+                                                    >
+                                                        {loadingVersion === versionData.Version && loadingAction === 'uninstall' ? (
+                                                            <span className="loader"></span>
+                                                        ) : (
+                                                            'Uninstall'
+                                                        )}
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

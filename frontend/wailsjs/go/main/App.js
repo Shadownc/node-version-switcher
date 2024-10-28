@@ -17,3 +17,7 @@ export function InstallNodeVersion(arg1) {
 export function SwitchNodeVersion(arg1) {
   return window['go']['main']['App']['SwitchNodeVersion'](arg1);
 }
+
+export function UninstallNodeVersion(arg1) {
+  return window['go']['main']['App']['UninstallNodeVersion'](arg1);
+}
