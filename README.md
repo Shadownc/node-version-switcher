@@ -10,4 +10,6 @@
 
 > 目前只支持windows
 
-![CHANGELOG](/CHANGELOG.md)
+## 更新日志
+
+查看完整的更新日志：[CHANGELOG.md](./CHANGELOG.md)
