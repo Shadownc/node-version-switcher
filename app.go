@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -13,8 +14,10 @@ import (
 
 // App struct
 type App struct {
-	ctx       context.Context
-	debugMode bool
+	ctx         context.Context
+	debugMode   bool
+	enableLogs  bool
+	logFilePath string // 新增字段
 }
 
 // NodeVersion 结构体存储已安装版本信息
@@ -31,8 +34,17 @@ type NodeVersionInfo struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
+	// 获取可执行文件所在目录
+	execPath, err := os.Executable()
+	logPath := "nvm-switcher.log"
+	if err == nil {
+		logPath = filepath.Join(filepath.Dir(execPath), "nvm-switcher.log")
+	}
+
 	return &App{
-		debugMode: false, // 默认关闭调试模式
+		debugMode:   false,
+		enableLogs:  false,
+		logFilePath: logPath,
 	}
 }
 
@@ -49,6 +61,13 @@ func (a *App) shutdown(ctx context.Context) {
 
 // beforeClose is called when the user tries to close the app
 func (a *App) beforeClose(ctx context.Context) (prevent bool) {
+	if a.enableLogs {
+		a.logToFile("Application closing initiated")
+	}
+
+	// 如果是通过系统关闭按钮退出，也要清理托盘
+	go quitSystray()
+
 	return false
 }
 
@@ -73,14 +92,48 @@ func (a *App) executeNvmCommand(args ...string) ([]byte, error) {
 
 // logToFile 记录日志到文件
 func (a *App) logToFile(message string) {
-	logFile := "nvm-switcher.log"
-	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// 添加调试输出
+	fmt.Printf("Debug: enableLogs = %v, debugMode = %v\n", a.enableLogs, a.debugMode)
+
+	if !a.enableLogs {
+		fmt.Println("Debug: Logging is disabled, returning")
+		return
+	}
+
+	// 确保日志目录存在
+	logDir := filepath.Dir(a.logFilePath)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		fmt.Printf("Debug: Failed to create log directory: %v\n", err)
+		// 如果创建目录失败，尝试使用用户目录
+		userHome, err := os.UserHomeDir()
+		if err == nil {
+			a.logFilePath = filepath.Join(userHome, "nvm-switcher.log")
+			logDir = userHome
+		} else {
+			fmt.Printf("Debug: Failed to get user home directory: %v\n", err)
+			return
+		}
+	}
+
+	fmt.Printf("Debug: Attempting to create/open log file at: %s\n", a.logFilePath)
+
+	f, err := os.OpenFile(a.logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		fmt.Printf("Debug: Failed to open log file: %v\n", err)
 		return
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "[%s] %s\n", time.Now().Format("2006-01-02 15:04:05"), message)
+	timeStamp := time.Now().Format("2006-01-02 15:04:05")
+	logMessage := fmt.Sprintf("[%s] %s\n", timeStamp, message)
+
+	_, writeErr := f.Write([]byte(logMessage))
+	if writeErr != nil {
+		fmt.Printf("Debug: Failed to write to log file: %v\n", writeErr)
+		return
+	}
+
+	fmt.Printf("Debug: Successfully wrote log message: %s\n", message)
 }
 
 // InstallNodeVersion installs a specific Node.js version using nvm
