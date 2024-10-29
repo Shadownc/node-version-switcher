@@ -17,6 +17,7 @@ export namespace main {
 	export class NodeVersionInfo {
 	    Version: string;
 	    Status: string;
+	    NpmVersion: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new NodeVersionInfo(source);
@@ -26,6 +27,7 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Version = source["Version"];
 	        this.Status = source["Status"];
+	        this.NpmVersion = source["NpmVersion"];
 	    }
 	}
 

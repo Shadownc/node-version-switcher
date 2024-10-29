@@ -9,3 +9,5 @@
 ![installed](/md/installed.png)
 
 > 目前只支持windows
+
+![CHANGELOG](/CHANGELOG.md)

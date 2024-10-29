@@ -110,6 +110,11 @@ function App() {
         }
     };
 
+    // Determine if npm column should be displayed based on the available data
+    const shouldDisplayNpmColumn = availableVersions.some(
+        (versionInfo) => versionInfo.NpmVersion && versionInfo.NpmVersion !== 'unknown'
+    );
+
     return (
         <div className="App min-h-screen bg-gray-900 text-white p-6 overflow-hidden">
             <h1 className="text-3xl font-bold mb-6 text-center">Node.js Version Manager</h1>
@@ -141,6 +146,7 @@ function App() {
                         <thead>
                             <tr>
                                 <th className="px-4 py-2">Version</th>
+                                {shouldDisplayNpmColumn && <th className="px-4 py-2">NPM Version</th>}
                                 <th className="px-4 py-2">Status</th>
                                 <th className="px-4 py-2">Operation</th>
                             </tr>
@@ -149,6 +155,11 @@ function App() {
                             {availableVersions.map((versionInfo, index) => (
                                 <tr key={index} className="border-t border-gray-700">
                                     <td className="px-4 py-2">{versionInfo.Version}</td>
+                                    {shouldDisplayNpmColumn && (
+                                        <td className="px-4 py-2">
+                                            {versionInfo.NpmVersion !== 'unknown' ? versionInfo.NpmVersion : '--'}
+                                        </td>
+                                    )}
                                     <td className="px-4 py-2">
                                         {versionInfo.Status === "Installed" ? (
                                             <span className="text-green-500">Installed</span>
