@@ -139,18 +139,11 @@ func (a *App) shutdown(ctx context.Context) {
 
 // beforeClose is called before the application is closed
 // beforeClose 在应用程序关闭前调用
-func (a *App) beforeClose(ctx context.Context) bool {
+func (a *App) beforeClose() bool {
 	if a.enableLogs {
 		a.logToFile("Application closing initiated")
 	}
 	return false
-}
-
-// logWithTimestamp logs a message with a timestamp
-// logWithTimestamp 记录带有时间戳的消息
-func (a *App) logWithTimestamp(message string) {
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	a.logToFile(fmt.Sprintf("[%s] %s", timestamp, message))
 }
 
 // logToFile logs a message to the specified log file if logging is enabled
@@ -340,15 +333,15 @@ func (a *App) GetAvailableNodeVersions() ([]NodeVersionInfo, error) {
 					}
 
 					// 处理 LTS 字段：可以是 bool 或字符串
-					ltsValue := "No"
-					switch v := versionInfo.LTS.(type) {
-					case bool:
-						if v {
-							ltsValue = "Yes"
-						}
-					case string:
-						ltsValue = v
-					}
+					// ltsValue := "No"
+					// switch v := versionInfo.LTS.(type) {
+					// case bool:
+					// 	if v {
+					// 		ltsValue = "Yes"
+					// 	}
+					// case string:
+					// 	ltsValue = v
+					// }
 
 					versions = append(versions, NodeVersionInfo{
 						Version:    versionInfo.Version,
@@ -356,7 +349,7 @@ func (a *App) GetAvailableNodeVersions() ([]NodeVersionInfo, error) {
 						NpmVersion: versionInfo.Npm, // 新增字段，将 npm 版本信息添加到结果中
 					})
 
-					a.logToFile(fmt.Sprintf("Version: %s, Status: %s, LTS: %s, NPM: %s", versionInfo.Version, status, ltsValue, versionInfo.Npm))
+					// a.logToFile(fmt.Sprintf("Version: %s, Status: %s, LTS: %s, NPM: %s", versionInfo.Version, status, ltsValue, versionInfo.Npm))
 				}
 
 				a.logToFile(fmt.Sprintf("Found %d available versions from Node.js API", len(versions)))

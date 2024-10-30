@@ -5,13 +5,10 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"sync"
-	"time"
 
 	"github.com/getlantern/systray"
+	"github.com/skratchdot/open-golang/open"
 	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/menu"
-	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
@@ -27,57 +24,21 @@ var trayIcon []byte
 // AppState struct is used to manage global state
 // AppState 结构体用于管理全局状态
 type AppState struct {
-	app        *App
-	ctx        context.Context
-	cancel     context.CancelFunc
-	mu         sync.RWMutex
-	quitChan   chan struct{}
-	isQuitting bool
+	app    *App
+	ctx    context.Context
+	cancel context.CancelFunc
 }
+
+var state = NewAppState()
 
 // NewAppState creates a new instance of AppState
 // NewAppState 创建一个新的 AppState 实例
 func NewAppState() *AppState {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &AppState{
-		ctx:      ctx,
-		cancel:   cancel,
-		quitChan: make(chan struct{}),
+		ctx:    ctx,
+		cancel: cancel,
 	}
-}
-
-var state = NewAppState()
-
-// SetContext sets the application context
-// SetContext 设置应用程序上下文
-func (s *AppState) SetContext(ctx context.Context) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.ctx = ctx
-}
-
-// GetContext retrieves the application context
-// GetContext 获取应用程序上下文
-func (s *AppState) GetContext() context.Context {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.ctx
-}
-
-// markQuitting marks the application is quitting
-// markQuitting 标记应用程序正在退出
-func (s *AppState) markQuitting() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.isQuitting = true
-}
-
-// isInQuitting checks if the application is in quitting state
-// isInQuitting 判断应用程序是否在退出中
-func (s *AppState) isInQuitting() bool {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.isQuitting
 }
 
 func main() {
@@ -85,20 +46,14 @@ func main() {
 	// 初始化 App
 	state.app = NewApp()
 
-	appMenu := menu.NewMenu()
-	FileMenu := appMenu.AddSubmenu("File")
-	FileMenu.AddText("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
-		if ctx := state.GetContext(); ctx != nil {
-			runtime.Quit(ctx)
-		}
-	})
-
+	// Start the system tray in a separate goroutine
+	// 启动托盘图标，运行在一个独立的 goroutine 中
 	go func() {
-		systray.Run(onReady, onExit)
+		runSystray()
 	}()
 
-	// Set debug mode
-	// 设置debug模式
+	// Set debug mode if environment variable is set
+	// 如果环境变量设置了DEBUG，则进入调试模式
 	if os.Getenv("DEBUG") == "true" {
 		state.app.debugMode = true
 		fmt.Println("Debug: Debug mode enabled via environment variable")
@@ -112,6 +67,8 @@ func main() {
 		fmt.Println("Debug: Log file already exists, skipping dialog")
 	}
 
+	// Run the Wails application
+	// 运行 Wails 应用程序
 	err := wails.Run(&options.App{
 		Title:            "Node Version Switcher",
 		Width:            1024,
@@ -126,12 +83,14 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		Menu:             appMenu,
+		// Menu:             appMenu,
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup: func(ctx context.Context) {
-			state.SetContext(ctx)
+			state.ctx = ctx // 存储 Wails 提供的上下文以便托盘操作使用
 			fmt.Println("Debug: Application starting up")
 
+			// Display dialog for logging setup if not in debug mode and no existing log file
+			// 如果不在调试模式且没有现存日志文件，显示日志设置对话框
 			if !existingLogFile && !state.app.debugMode {
 				fmt.Println("Debug: Not in debug mode and no existing log file, showing dialog")
 
@@ -142,9 +101,9 @@ func main() {
 						Type:          runtime.QuestionDialog,
 						Title:         "日志设置",
 						Message:       "是否启用应用程序日志记录？",
-						Buttons:       []string{"是", "否"},
-						DefaultButton: "否",
-						CancelButton:  "否",
+						Buttons:       []string{"Yes", "No"},
+						DefaultButton: "No",
+						CancelButton:  "No",
 					})
 
 					if err != nil {
@@ -155,12 +114,12 @@ func main() {
 
 					fmt.Printf("Debug: Dialog result: %s\n", result)
 
-					if result == "Yes" { // 保持原功能不变
-						fmt.Println("Debug: User selected '是', enabling logs")
+					if result == "Yes" {
+						fmt.Println("Debug: User selected 'Yes', enabling logs")
 						state.app.enableLogs = true
 						fmt.Println("Debug: Logging has been enabled")
 					} else {
-						fmt.Println("Debug: User selected '否', logs will be disabled")
+						fmt.Println("Debug: User selected 'No', logs will be disabled")
 					}
 
 					dialogComplete <- true
@@ -184,10 +143,7 @@ func main() {
 		},
 		OnShutdown: state.app.shutdown,
 		OnBeforeClose: func(ctx context.Context) bool {
-			if state.isInQuitting() {
-				return false
-			}
-			return state.app.beforeClose(ctx)
+			return state.app.beforeClose()
 		},
 		Bind: []interface{}{
 			state.app,
@@ -211,77 +167,56 @@ func main() {
 	}
 }
 
+// runSystray runs the systray
+// runSystray 运行托盘图标
+func runSystray() {
+	systray.Run(onReady, onExit)
+}
+
 // onReady is the callback when the system tray icon is ready
 // onReady 是托盘图标就绪后的回调
 func onReady() {
-	systray.SetIcon(trayIcon)
-	systray.SetTitle("Node Version Switcher")
-	systray.SetTooltip("nvm可视化")
-
-	// Right-click menu items
-	// 右键菜单项
-	showAppMenuItem := systray.AddMenuItem("显示窗口", "Show the application window")
-	systray.AddSeparator()
-	quitMenuItem := systray.AddMenuItem("退出", "Quit the application")
-
-	// Hidden menu item used to capture left-click events
-	// 隐藏的菜单项，用于捕获左键单击事件
-	mLeftClick := systray.AddMenuItem("", "")
-	mLeftClick.Hide()
-
-	// Left-click to directly show the window
-	// 左键单击直接显示窗口
 	go func() {
+		systray.SetTemplateIcon(trayIcon, trayIcon)
+		systray.SetTitle("Node Version Switcher")
+		systray.SetTooltip("nvm可视化")
+		blog := systray.AddMenuItem("博客", "Blog")
+		github := systray.AddMenuItem("Github", "Github")
+		mShow := systray.AddMenuItem("显示应用", "mShow")
+		mQuit := systray.AddMenuItem("退出", "Quit")
 		for {
 			select {
-			case <-mLeftClick.ClickedCh: // 左键点击直接显示窗口
-				showWindow()
-			case <-showAppMenuItem.ClickedCh: // 右键菜单的“显示窗口”
-				showWindow()
-			case <-quitMenuItem.ClickedCh: // 右键菜单的“退出”
-				gracefulQuit()
-				return
+			case <-blog.ClickedCh:
+				open.Run("https://blog.lmyself.top")
+			case <-github.ClickedCh:
+				open.Run("https://github.com/Shadownc/node-version-switcher")
+			case <-mShow.ClickedCh:
+				// 显示应用窗口
+				// 使用 Wails 提供的 runtime API 来显示应用窗口
+				fmt.Println("Debug: User clicked 'Show Application'")
+				if state.ctx != nil {
+					runtime.WindowShow(state.ctx)
+					fmt.Println("Debug: Application window shown successfully")
+				} else {
+					fmt.Println("Debug: Context is nil, cannot show window")
+				}
+			case <-mQuit.ClickedCh:
+				// 退出应用
+				fmt.Println("Debug: User clicked 'Quit', shutting down application")
+				systray.Quit()                // 关闭托盘图标
+				state.app.shutdown(state.ctx) // 调用 app 的 shutdown 以确保应用程序关闭
+				os.Exit(0)                    // 完全退出程序
 			}
 		}
 	}()
 }
 
-// showWindow function to add retry mechanism
-// showWindow 函数，添加重试机制
-func showWindow() {
-	if appCtx := state.GetContext(); appCtx != nil && !state.isInQuitting() {
-		go func() {
-			for i := 0; i < 3; i++ { // 最多尝试三次 // Retry up to three times
-				runtime.WindowShow(appCtx)
-				runtime.WindowUnminimise(appCtx)
-				runtime.WindowSetAlwaysOnTop(appCtx, true)
-				time.Sleep(time.Millisecond * 100)
-				runtime.WindowSetAlwaysOnTop(appCtx, false)
-				// 移除错误的判断，保持原有逻辑功能不变
-				break
-			}
-		}()
-	}
-}
-
-// gracefulQuit gracefully quits the tray application
-// gracefulQuit 实现托盘应用程序的优雅退出
-func gracefulQuit() {
-	state.markQuitting()
-	if appCtx := state.GetContext(); appCtx != nil {
-		runtime.WindowHide(appCtx)
-	}
-	systray.Quit()
-	if appCtx := state.GetContext(); appCtx != nil {
-		runtime.Quit(appCtx)
-	}
-}
-
 // onExit is the callback when the tray application exits
 // onExit 是托盘程序退出时的回调
 func onExit() {
-	ctx := state.GetContext()
-	if ctx != nil && state.app != nil && state.app.enableLogs {
+	fmt.Println("Debug: onExit called, application is shutting down")
+	if state.app != nil && state.app.enableLogs {
 		state.app.logToFile("Application shutting down")
 	}
+	fmt.Println("Debug: Logs have been saved, exit complete")
 }
