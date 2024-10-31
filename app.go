@@ -184,14 +184,20 @@ func (a *App) logToFile(message string) {
 func (a *App) executeNvmCommand(args ...string) ([]byte, error) {
 	a.updateLastActive()
 
-	cmd := exec.Command("nvm", args...)
+	// 通过 cmd 来运行 nvm
+	cmd := exec.Command("cmd", append([]string{"/c", "nvm"}, args...)...)
 
+	// 继承当前环境变量
+	cmd.Env = os.Environ()
+
+	// 如果不处于调试模式则隐藏窗口
 	if !a.debugMode {
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			HideWindow: true,
 		}
 	}
 
+	// 获取输出结果
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		a.logToFile(fmt.Sprintf("Command failed: nvm %v\nError: %v\nOutput: %s\n",
