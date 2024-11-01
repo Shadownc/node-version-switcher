@@ -1,5 +1,16 @@
 # 更新日志
 
+## v0.0.5 - 2024-11-01
+### 新增功能
+- 无
+
+### 优化
+- 无
+
+### 修复
+- 修复了从`Node.js`官方`API`获取可用版本信息后可用列表是否已安装状态的判断
+- 不建议更新`nvm-windows`1.1.12版本 该版本存在`NVM for Windows should be run from a terminal such as CMD or PowerShell.`的问题 等官方修复即可。
+
 ## v0.0.4 - 2024-10-30
 ### 新增功能
 - 系统托盘菜单修改。

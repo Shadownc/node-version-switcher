@@ -327,8 +327,9 @@ func (a *App) GetAvailableNodeVersions() ([]NodeVersionInfo, error) {
 				}
 
 				for _, versionInfo := range nodeVersions {
+					cleanVersion := strings.TrimPrefix(versionInfo.Version, "v")
 					status := "Not Installed"
-					if installedMap[versionInfo.Version] {
+					if installedMap[cleanVersion] {
 						status = "Installed"
 					}
 
@@ -344,7 +345,7 @@ func (a *App) GetAvailableNodeVersions() ([]NodeVersionInfo, error) {
 					// }
 
 					versions = append(versions, NodeVersionInfo{
-						Version:    versionInfo.Version,
+						Version:    cleanVersion,
 						Status:     status,
 						NpmVersion: versionInfo.Npm, // 新增字段，将 npm 版本信息添加到结果中
 					})
